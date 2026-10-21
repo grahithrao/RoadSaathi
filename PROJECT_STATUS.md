@@ -11,6 +11,7 @@
 
 - [x] **Workspace & Environment Audit**: Node v24.13.1, npm 11.8.0, PostgreSQL 17
 - [x] **Database Setup**: Local PostgreSQL databases created: `roadsaathi_dev`, `roadsaathi_test`
+- [x] **GitHub Repository**: Created & pushed to [https://github.com/grahithrao/RoadSaathi](https://github.com/grahithrao/RoadSaathi) (branch `main`)
 - [x] **Stage 1: Monorepo Foundation & Schema**: `@roadsaathi/contracts`, `@roadsaathi/config`, Prisma 24-table PostgreSQL schema
 - [x] **Stage 2: Core Domain Logic & Concurrency**: Atomic acceptance transactions, single-job constraints, integer paise pricing math
 - [x] **Stage 3: NestJS Backend API & Gateway**: REST endpoints, Socket.IO tracking gateway, BullMQ worker (`apps/worker`)
