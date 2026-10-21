@@ -1,0 +1,37 @@
+{
+  "expo": {
+    "name": "RoadSaathi",
+    "slug": "roadsaathi",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "roadsaathi",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "backgroundColor": "#F5FAFF"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "in.roadsaathi.app",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "RoadSaathi requires your location to connect you with nearby mechanics during a breakdown.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Mechanic background location updates are required during active roadside jobs to inform the stranded driver."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#F5FAFF"
+      },
+      "package": "in.roadsaathi.app",
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "FOREGROUND_SERVICE"
+      ]
+    },
+    "plugins": [
+      "expo-router"
+    ]
+  }
+}

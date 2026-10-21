@@ -1,0 +1,750 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum UserRole {
+  CUSTOMER
+  MECHANIC
+  GARAGE_OWNER
+  ADMIN_SUPPORT
+  ADMIN_VERIFICATION
+  ADMIN_FINANCE
+  SUPER_ADMIN
+}
+
+enum VehicleType {
+  TWO_WHEELER
+  FOUR_WHEELER_PETROL
+  FOUR_WHEELER_DIESEL
+  FOUR_WHEELER_EV
+  FOUR_WHEELER_CNG
+  COMMERCIAL
+}
+
+enum ProblemCategory {
+  FLAT_TYRE
+  BATTERY_ISSUE
+  VEHICLE_NOT_STARTING
+  OVERHEATING
+  MINOR_MECHANICAL
+  TOWING
+  NOT_SURE
+}
+
+enum VerificationStatus {
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  CHANGES_REQUESTED
+  APPROVED
+  REJECTED
+  SUSPENDED
+}
+
+enum ProviderType {
+  INDIVIDUAL_MOBILE
+  WORKSHOP_WITH_MOBILE
+  WORKSHOP_ONLY
+  TOWING_OPERATOR
+}
+
+enum BookingStatus {
+  DRAFT
+  SEARCHING
+  OFFERED
+  ASSIGNED
+  EN_ROUTE
+  ARRIVED
+  DIAGNOSING
+  AWAITING_QUOTE_APPROVAL
+  IN_PROGRESS
+  COMPLETION_PENDING
+  COMPLETED
+  CANCELLED
+  EXPIRED
+  UNFULFILLED
+}
+
+enum DispatchOfferStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  EXPIRED
+  SUPERSEDED
+}
+
+enum QuoteStatus {
+  DRAFT
+  PRESENTED
+  ACCEPTED
+  REJECTED
+  EXPIRED
+}
+
+enum PaymentStatus {
+  PENDING
+  AUTHORIZED
+  CAPTURED
+  FAILED
+  REFUNDED
+  PARTIALLY_REFUNDED
+  DISPUTED
+}
+
+enum PaymentMethod {
+  RAZORPAY_UPI
+  RAZORPAY_CARD
+  RAZORPAY_NETBANKING
+  CASH_ON_COMPLETION
+}
+
+enum CashReconciliationStatus {
+  NOT_APPLICABLE
+  PENDING_CONFIRMATION
+  CONFIRMED
+  DISPUTED
+}
+
+enum LedgerEntryType {
+  CUSTOMER_PAYMENT
+  MECHANIC_EARNING
+  PLATFORM_COMMISSION
+  PLATFORM_FEE
+  TAX_COLLECTED
+  REFUND_DEBIT
+  CASH_COMMISSION_RECEIVABLE
+  SETTLEMENT_PAYOUT
+}
+
+enum DocumentType {
+  AADHAAR_FRONT
+  AADHAAR_BACK
+  PAN_CARD
+  DRIVING_LICENSE
+  SHOP_REGISTRATION
+  GST_CERTIFICATE
+  MECHANIC_CERTIFICATE
+  BANK_PASSBOOK
+}
+
+enum NotificationChannel {
+  SMS
+  PUSH
+  EMAIL
+  IN_APP
+}
+
+enum SupportTicketStatus {
+  OPEN
+  IN_PROGRESS
+  WAITING_ON_USER
+  RESOLVED
+  CLOSED
+}
+
+model User {
+  id                String            @id @default(uuid())
+  phone             String            @unique
+  email             String?           @unique
+  passwordHash      String?
+  role              UserRole          @default(CUSTOMER)
+  name              String?
+  preferredLanguage String            @default("en")
+  isActive          Boolean           @default(true)
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  customerProfile   CustomerProfile?
+  mechanicProfile   MechanicProfile?
+  ownedGarage       Garage?
+  supportTickets    SupportTicket[]
+  auditLogs         AuditLog[]
+  consentRecords    ConsentRecord[]
+
+  @@index([phone])
+  @@index([role])
+}
+
+model CustomerProfile {
+  id                String            @id @default(uuid())
+  userId            String            @unique
+  user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  emergencyContact  String?
+  consentMarketing  Boolean           @default(false)
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  vehicles          Vehicle[]
+  bookings          Booking[]
+  reviews           Review[]
+  quoteApprovals    QuoteApproval[]
+}
+
+model Vehicle {
+  id                 String          @id @default(uuid())
+  customerProfileId  String
+  customerProfile    CustomerProfile @relation(fields: [customerProfileId], references: [id], onDelete: Cascade)
+  make               String
+  model              String
+  year               Int?
+  vehicleType        VehicleType
+  fuelType           String          @default("PETROL")
+  registrationNumber String?
+  isDefault          Boolean         @default(false)
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  bookings           Booking[]
+
+  @@index([customerProfileId])
+}
+
+model Garage {
+  id          String             @id @default(uuid())
+  ownerId     String             @unique
+  owner       User               @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  name        String
+  address     String
+  latitude    Float
+  longitude   Float
+  phone       String
+  email       String?
+  isVerified  Boolean            @default(false)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  mechanics   MechanicProfile[]
+  memberships GarageMembership[]
+  bookings    Booking[]
+
+  @@index([latitude, longitude])
+}
+
+model MechanicProfile {
+  id                     String                   @id @default(uuid())
+  userId                 String                   @unique
+  user                   User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  garageId               String?
+  garage                 Garage?                  @relation(fields: [garageId], references: [id], onDelete: SetNull)
+  fullName               String
+  businessName           String
+  providerType           ProviderType             @default(INDIVIDUAL_MOBILE)
+  workshopAddress        String
+  latitude               Float
+  longitude              Float
+  serviceRadiusKm        Float                    @default(10.0)
+  baseVisitFeePaise      Int                      @default(29900)
+  prepTimeMinutes        Int                      @default(15)
+  verificationStatus     VerificationStatus       @default(DRAFT)
+  isOnline               Boolean                  @default(false)
+  isRoadsideReady        Boolean                  @default(true)
+  currentActiveBookingId String?                  @unique
+  lastHeartbeatAt        DateTime?
+  ratingAverage          Float                    @default(0.0)
+  ratingCount            Int                      @default(0)
+  languages              String[]                 @default(["en", "hi"])
+  createdAt              DateTime                 @default(now())
+  updatedAt              DateTime                 @updatedAt
+
+  garageMemberships      GarageMembership[]
+  services               ProviderService[]
+  documents              VerificationDocument[]
+  submissions            VerificationSubmission[]
+  dispatchOffers         DispatchOffer[]
+  bookings               Booking[]
+  locationSamples        LocationSample[]
+  reviews                Review[]
+  settlements            Settlement[]
+  coverageAreas          CoverageArea[]
+  availabilitySchedules  AvailabilitySchedule[]
+
+  @@index([latitude, longitude])
+  @@index([isOnline, verificationStatus, isRoadsideReady])
+}
+
+model GarageMembership {
+  id                String          @id @default(uuid())
+  garageId          String
+  garage            Garage          @relation(fields: [garageId], references: [id], onDelete: Cascade)
+  mechanicProfileId String
+  mechanicProfile   MechanicProfile @relation(fields: [mechanicProfileId], references: [id], onDelete: Cascade)
+  roleInGarage      String          @default("TECHNICIAN")
+  isActive          Boolean         @default(true)
+  joinedAt          DateTime        @default(now())
+
+  @@unique([garageId, mechanicProfileId])
+}
+
+model VerificationSubmission {
+  id                String                 @id @default(uuid())
+  mechanicProfileId String
+  mechanicProfile   MechanicProfile        @relation(fields: [mechanicProfileId], references: [id], onDelete: Cascade)
+  status            VerificationStatus     @default(SUBMITTED)
+  reviewNotes       String?
+  reviewerId        String?
+  submittedAt       DateTime               @default(now())
+  reviewedAt        DateTime?
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+
+  documents         VerificationDocument[]
+
+  @@index([mechanicProfileId])
+  @@index([status])
+}
+
+model VerificationDocument {
+  id                String                  @id @default(uuid())
+  submissionId      String?
+  submission        VerificationSubmission? @relation(fields: [submissionId], references: [id], onDelete: SetNull)
+  mechanicProfileId String
+  mechanicProfile   MechanicProfile         @relation(fields: [mechanicProfileId], references: [id], onDelete: Cascade)
+  documentType      DocumentType
+  fileUrl           String
+  fileName          String
+  mimeType          String
+  fileSize          Int
+  verifiedAt        DateTime?
+  createdAt         DateTime                @default(now())
+
+  @@index([mechanicProfileId])
+}
+
+model ServiceCategory {
+  id                  String            @id @default(uuid())
+  code                ProblemCategory   @unique
+  name                String
+  description         String
+  icon                String
+  isRoadsideEligible  Boolean           @default(true)
+  defaultVisitFeePaise Int              @default(29900)
+  createdAt           DateTime          @default(now())
+
+  providerServices    ProviderService[]
+}
+
+model ProviderService {
+  id                String          @id @default(uuid())
+  mechanicProfileId String
+  mechanicProfile   MechanicProfile @relation(fields: [mechanicProfileId], references: [id], onDelete: Cascade)
+  serviceCategoryId String
+  serviceCategory   ServiceCategory @relation(fields: [serviceCategoryId], references: [id], onDelete: Cascade)
+  customPricePaise  Int?
+  isAvailable       Boolean         @default(true)
+  createdAt         DateTime        @default(now())
+
+  @@unique([mechanicProfileId, serviceCategoryId])
+}
+
+model CoverageArea {
+  id                String          @id @default(uuid())
+  mechanicProfileId String
+  mechanicProfile   MechanicProfile @relation(fields: [mechanicProfileId], references: [id], onDelete: Cascade)
+  centerLat         Float
+  centerLng         Float
+  radiusKm          Float           @default(10.0)
+  createdAt         DateTime        @default(now())
+
+  @@index([mechanicProfileId])
+}
+
+model AvailabilitySchedule {
+  id                String          @id @default(uuid())
+  mechanicProfileId String
+  mechanicProfile   MechanicProfile @relation(fields: [mechanicProfileId], references: [id], onDelete: Cascade)
+  dayOfWeek         Int             // 0 = Sunday, 6 = Saturday
+  startHour         Int             @default(8)
+  startMinute       Int             @default(0)
+  endHour           Int             @default(20)
+  endMinute         Int             @default(0)
+  isOffDay          Boolean         @default(false)
+
+  @@index([mechanicProfileId, dayOfWeek])
+}
+
+model Booking {
+  id                          String                   @id @default(uuid())
+  bookingNumber               String                   @unique
+  customerProfileId           String
+  customerProfile             CustomerProfile          @relation(fields: [customerProfileId], references: [id], onDelete: Cascade)
+  vehicleId                   String
+  vehicle                     Vehicle                  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  mechanicProfileId           String?
+  mechanicProfile             MechanicProfile?         @relation(fields: [mechanicProfileId], references: [id], onDelete: SetNull)
+  garageId                    String?
+  garage                      Garage?                  @relation(fields: [garageId], references: [id], onDelete: SetNull)
+
+  status                      BookingStatus            @default(DRAFT)
+  problemCategory             ProblemCategory
+  problemDescription          String?
+  photoUrls                   String[]                 @default([])
+
+  customerLatitude            Float
+  customerLongitude           Float
+  customerAddress             String
+  customerLandmark            String?
+
+  acceptedVisitFeePaise       Int                      @default(29900)
+  distanceSurchargePaise      Int                      @default(0)
+  platformFeePaise            Int                      @default(4900)
+  taxPaise                    Int                      @default(6264)
+  totalEstimatedVisitFeePaise Int                      @default(41064)
+
+  // Arrival and Completion Verification Codes (stored as SHA256 hashes)
+  arrivalOtpHash              String?
+  arrivalOtpExpiresAt         DateTime?
+  arrivalOtpAttempts          Int                      @default(0)
+
+  completionOtpHash           String?
+  completionOtpExpiresAt      DateTime?
+  completionOtpAttempts       Int                      @default(0)
+
+  assignedAt                  DateTime?
+  arrivedAt                   DateTime?
+  startedAt                   DateTime?
+  completedAt                 DateTime?
+  cancelledAt                 DateTime?
+  cancellationReason          String?
+  cancelledByRole             UserRole?
+
+  idempotencyKey              String                   @unique
+  version                     Int                      @default(1) // Optimistic concurrency lock
+  createdAt                   DateTime                 @default(now())
+  updatedAt                   DateTime                 @updatedAt
+
+  dispatchOffers              DispatchOffer[]
+  assignmentAttempts          AssignmentAttempt[]
+  events                      BookingEvent[]
+  quotes                      Quote[]
+  locationSamples             LocationSample[]
+  messages                    Message[]
+  payments                    Payment[]
+  ledgerEntries               LedgerEntry[]
+  reviews                     Review[]
+  supportTickets              SupportTicket[]
+
+  @@index([customerProfileId])
+  @@index([mechanicProfileId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model DispatchOffer {
+  id                      String              @id @default(uuid())
+  bookingId               String
+  booking                 Booking             @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  mechanicProfileId       String
+  mechanicProfile         MechanicProfile     @relation(fields: [mechanicProfileId], references: [id], onDelete: Cascade)
+  status                  DispatchOfferStatus @default(PENDING)
+  offeredAt               DateTime            @default(now())
+  expiresAt               DateTime
+  respondedAt             DateTime?
+  declineReason           String?
+  estimatedDistanceMeters Int
+  estimatedDurationSeconds Int
+  estimatedEarningsPaise  Int
+
+  @@unique([bookingId, mechanicProfileId])
+  @@index([mechanicProfileId, status])
+}
+
+model AssignmentAttempt {
+  id                String          @id @default(uuid())
+  bookingId         String
+  booking           Booking         @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  mechanicProfileId String
+  attemptNumber     Int             @default(1)
+  outcome           String
+  reason            String?
+  createdAt         DateTime        @default(now())
+
+  @@index([bookingId])
+}
+
+model BookingEvent {
+  id         String        @id @default(uuid())
+  bookingId  String
+  booking    Booking       @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  fromStatus BookingStatus
+  toStatus   BookingStatus
+  actorId    String
+  actorRole  UserRole
+  reason     String?
+  metadata   Json?
+  createdAt  DateTime      @default(now())
+
+  @@index([bookingId, createdAt])
+}
+
+model Quote {
+  id                     String          @id @default(uuid())
+  bookingId              String
+  booking                Booking         @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  version                Int             @default(1)
+  status                 QuoteStatus     @default(PRESENTED)
+  laborSubtotalPaise     Int             @default(0)
+  partsSubtotalPaise     Int             @default(0)
+  grossSubtotalPaise     Int             @default(0)
+  diagnosisCreditPaise   Int             @default(0)
+  taxableAmountPaise     Int             @default(0)
+  taxPaise               Int             @default(0)
+  netPayablePaise        Int             @default(0)
+  notes                  String?
+  validUntil             DateTime
+  presentedAt            DateTime        @default(now())
+  respondedAt            DateTime?
+  rejectionReason        String?
+  createdAt              DateTime        @default(now())
+  updatedAt              DateTime        @updatedAt
+
+  items                  QuoteItem[]
+  approval               QuoteApproval?
+
+  @@unique([bookingId, version])
+  @@index([bookingId])
+}
+
+model QuoteItem {
+  id             String   @id @default(uuid())
+  quoteId        String
+  quote          Quote    @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  type           String   // 'LABOR' | 'PART' | 'OTHER'
+  description    String
+  quantity       Int      @default(1)
+  unitPricePaise Int
+  totalPaise     Int
+
+  @@index([quoteId])
+}
+
+model QuoteApproval {
+  id                  String          @id @default(uuid())
+  quoteId             String          @unique
+  quote               Quote           @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  customerProfileId   String
+  customerProfile     CustomerProfile @relation(fields: [customerProfileId], references: [id], onDelete: Cascade)
+  approvedVersion     Int
+  approvedAmountPaise Int
+  approvedAt          DateTime        @default(now())
+  ipAddress           String?
+
+  @@index([customerProfileId])
+}
+
+model LocationSample {
+  id                String          @id @default(uuid())
+  bookingId         String
+  booking           Booking         @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  mechanicProfileId String
+  mechanicProfile   MechanicProfile @relation(fields: [mechanicProfileId], references: [id], onDelete: Cascade)
+  latitude          Float
+  longitude         Float
+  heading           Float?
+  speed             Float?
+  accuracyMeters    Float?
+  recordedAt        DateTime        @default(now())
+
+  @@index([bookingId, recordedAt])
+}
+
+model Message {
+  id         String   @id @default(uuid())
+  bookingId  String
+  booking    Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  senderId   String
+  senderRole UserRole
+  content    String
+  imageUrl   String?
+  isRead     Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@index([bookingId, createdAt])
+}
+
+model NotificationJob {
+  id              String              @id @default(uuid())
+  recipientPhone  String?
+  recipientEmail  String?
+  recipientUserId String?
+  channel         NotificationChannel @default(SMS)
+  title           String
+  body            String
+  payloadJson     Json?
+  status          String              @default("PENDING") // PENDING, SENT, FAILED
+  attempts        Int                 @default(0)
+  sentAt          DateTime?
+  createdAt       DateTime            @default(now())
+
+  @@index([status])
+}
+
+model Payment {
+  id                 String                   @id @default(uuid())
+  bookingId          String
+  booking            Booking                  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  amountPaise        Int
+  currency           String                   @default("INR")
+  status             PaymentStatus            @default(PENDING)
+  paymentMethod      PaymentMethod
+  razorpayOrderId    String?                  @unique
+  razorpayPaymentId  String?                  @unique
+  razorpaySignature  String?
+  cashReconciliation CashReconciliationStatus @default(NOT_APPLICABLE)
+  failureReason      String?
+  capturedAt         DateTime?
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
+
+  refunds            Refund[]
+
+  @@index([bookingId])
+  @@index([status])
+}
+
+model WebhookEvent {
+  id          String   @id @default(uuid())
+  gateway     String   @default("RAZORPAY")
+  eventId     String   @unique
+  eventType   String
+  payloadJson Json
+  signature   String
+  processed   Boolean  @default(false)
+  processedAt DateTime?
+  error       String?
+  createdAt   DateTime @default(now())
+
+  @@index([eventId])
+  @@index([processed])
+}
+
+model LedgerEntry {
+  id          String          @id @default(uuid())
+  bookingId   String?
+  booking     Booking?        @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  entryType   LedgerEntryType
+  debitPaise  Int             @default(0)
+  creditPaise Int             @default(0)
+  accountType String          // 'PLATFORM', 'MECHANIC', 'CUSTOMER', 'TAX_PAYABLE'
+  description String
+  referenceId String?
+  createdAt   DateTime        @default(now())
+
+  @@index([bookingId])
+  @@index([accountType, createdAt])
+}
+
+model Settlement {
+  id                   String          @id @default(uuid())
+  mechanicProfileId    String
+  mechanicProfile      MechanicProfile @relation(fields: [mechanicProfileId], references: [id], onDelete: Cascade)
+  razorpayFundAccountId String?
+  amountPaise          Int
+  status               String          @default("PENDING") // PENDING, PROCESSED, FAILED, REVERSED
+  transferId           String?
+  settledAt            DateTime?
+  createdAt            DateTime        @default(now())
+
+  @@index([mechanicProfileId])
+}
+
+model Refund {
+  id               String   @id @default(uuid())
+  paymentId        String
+  payment          Payment  @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  bookingId        String
+  amountPaise      Int
+  reason           String
+  status           String   @default("PENDING") // PENDING, PROCESSED, FAILED
+  razorpayRefundId String?
+  createdAt        DateTime @default(now())
+
+  @@index([paymentId])
+  @@index([bookingId])
+}
+
+model Review {
+  id                  String          @id @default(uuid())
+  bookingId           String          @unique
+  booking             Booking         @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  customerProfileId   String
+  customerProfile     CustomerProfile @relation(fields: [customerProfileId], references: [id], onDelete: Cascade)
+  mechanicProfileId   String
+  mechanicProfile     MechanicProfile @relation(fields: [mechanicProfileId], references: [id], onDelete: Cascade)
+  rating              Int             // 1 to 5
+  comment             String?
+  timelinessRating    Int?
+  professionalRating  Int?
+  transparencyRating  Int?
+  isVisible           Boolean         @default(true)
+  moderatedBy         String?
+  createdAt           DateTime        @default(now())
+
+  @@index([mechanicProfileId, isVisible])
+}
+
+model SupportTicket {
+  id           String              @id @default(uuid())
+  ticketNumber String              @unique
+  bookingId    String?
+  booking      Booking?            @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  userId       String
+  user         User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subject      String
+  description  String
+  status       SupportTicketStatus @default(OPEN)
+  priority     String              @default("MEDIUM") // LOW, MEDIUM, HIGH, URGENT
+  resolvedAt   DateTime?
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+
+  @@index([userId])
+  @@index([status])
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  actorId    String
+  actorRole  UserRole
+  actor      User     @relation(fields: [actorId], references: [id], onDelete: Cascade)
+  action     String
+  entityType String
+  entityId   String
+  diffJson   Json?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([actorId, createdAt])
+}
+
+model ConsentRecord {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  consentType String   // 'TERMS_AND_CONDITIONS', 'PRIVACY_POLICY', 'LOCATION_TRACKING'
+  granted     Boolean  @default(true)
+  ipAddress   String?
+  userAgent   String?
+  version     String   @default("1.0")
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+}
+
+model IdempotencyRecord {
+  key              String   @id
+  route            String
+  requestHash      String
+  responseStatus   Int
+  responseBodyJson Json
+  createdAt        DateTime @default(now())
+  expiresAt        DateTime
+
+  @@index([expiresAt])
+}

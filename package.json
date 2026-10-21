@@ -1,0 +1,33 @@
+{
+  "name": "roadsaathi-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "RoadSaathi - Local mechanics. Reliable roadside help. (India)",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "dev:api": "npm run dev --workspace=apps/api",
+    "dev:web": "npm run dev --workspace=apps/web",
+    "dev:mobile": "npm run start --workspace=apps/mobile",
+    "db:migrate": "npm run prisma:migrate --workspace=apps/api",
+    "db:generate": "npm run prisma:generate --workspace=apps/api",
+    "db:seed": "npm run seed --workspace=apps/api"
+  },
+  "keywords": [
+    "roadside-assistance",
+    "mechanic-marketplace",
+    "india",
+    "postgis",
+    "nestjs",
+    "nextjs",
+    "react-native",
+    "expo"
+  ],
+  "author": "RoadSaathi Team",
+  "license": "UNLICENSED"
+}
